@@ -20,9 +20,9 @@ function route(matcher) {
 
     return function (...routes) {
 
-        return async function (obj) {
+        return async function (subject) {
 
-            let match = await matcher(obj);
+            let match = await matcher(subject);
 
             if (match === true) {
 
@@ -34,9 +34,9 @@ function route(matcher) {
 
                     for (let route of routes) {
 
-                        let pass = await route(obj);
+                        let pass = await route(subject);
 
-                        if (pass === true) {
+                        if (pass === true || pass === null || pass === undefined) {
                             //  The routing has succeeded and terminated successfully; hence, return success.
                             return true;
                         }
@@ -46,8 +46,8 @@ function route(matcher) {
                     //  A route match was not found; hence, return a failed routing.
                 }
             }
-            else {
-                return false;
+            else if (match === false || match === null || match === undefined) {
+                return match;
             }
         }
     }
@@ -57,17 +57,23 @@ function route(matcher) {
 try {
 
     let host = route(() => true);
-    let get = route((obj) => obj.req.method == 'GET');
-    let post = route((obj) => obj.req.method == 'POST');
-    let api = route((obj) => obj.res.end('test'));
-    let resource = route(() => true);
+    let get = route((sub) => sub.req.method == 'GET');
+    let post = route((sub) => sub.req.method == 'POST');
+    let api = route((sub) => sub.req.path == 'api');
+    let succeed = route((sub) => { sub.res.end('succeed') });
+    let error = route((sub) => { throw new Error() });
+    let resource = route((sub) => sub.req.path == 'resource');
     let authenticator = route(() => true);
 
-    let router = host(
+    let root = host(
         get(
             authenticator(
-                api(),
-                resource()
+                api(
+                    succeed()
+                ),
+                resource(
+                    error()
+                )
             )
         ),
         post(
@@ -94,19 +100,33 @@ try {
 
         try {
 
-            let obj = {
+            let sub1 = {
                 req: {
-                    method: 'GET'
+                    method: 'GET',
+                    path: 'api'
                 },
                 res: {
-                    end: function(message) {
-                        
+                    end: function (message) {
                         console.log(message);
                     }
                 }
             }
 
-            await router(obj);
+            await root(sub1);
+
+            let sub2 = {
+                req: {
+                    method: 'GET',
+                    path: 'resource'
+                },
+                res: {
+                    end: function (message) {
+                        console.log(message);
+                    }
+                }
+            }
+
+            await root(sub2);
         }
         catch (e) {
 
@@ -115,7 +135,6 @@ try {
     })();
 }
 catch (e) {
-
     console.error(e);
     throw (e);
 }
