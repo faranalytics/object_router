@@ -1,4 +1,3 @@
-
 import * as http from 'http';
 import * as https from 'https';
 
@@ -17,55 +16,52 @@ class HTTPServer {
     }
 }
 
-function route(matcher, handler) {
+function route(matcher) {
 
-    class Route {
-        constructor() {
-            this.handle = this.handle.bind(this);
-            this.routes = [];
-        }
+    return function (...routes) {
 
-        async handle(obj) {
-            if (typeof matcher == 'function') {
-                if (await matcher(obj)) {
-                    if (typeof handler == 'function') {
-                        if (await handler(obj)) {
-                            for (let i = 0; i < this.routes.length; i += 1) {
-                                if (typeof this.routes[i] == 'object' && this.routes[i]) {
-                                    if (await this.routes[i].handle(obj)) {
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
+        return async function (obj) {
+
+            let match = await matcher(obj);
+
+            if (match === true) {
+
+                if (routes.length == 0) {
+                    //  The object matched and this is a terminating route; hence, return true.
                     return true;
                 }
                 else {
+
+                    for (let route of routes) {
+
+                        let pass = await route(obj);
+
+                        if (pass === true) {
+                            //  The routing has succeeded and terminated successfully; hence, return success.
+                            return true;
+                        }
+                    }
+
                     return false;
+                    //  A route match was not found; hence, return a failed routing.
                 }
             }
-
+            else {
+                return false;
+            }
         }
-    }
-
-    return function (...args) {
-
-        let route = new Route();
-        route.routes = route.routes.concat([...args]);
-        return route;
     }
 }
 
 
 try {
 
-    let host = route(() => true, (obj) => true);
-    let get = route((obj) => obj.req.method == 'GET', () => true);
-    let post = route((obj) => obj.req.method == 'POST', () => true);
-    let api = route(() => true, (obj) => obj.res.end('test'));
-    let resource = route(() => true, () => true);
-    let authenticator = route(() => true, () => true);
+    let host = route(() => true);
+    let get = route((obj) => obj.req.method == 'GET');
+    let post = route((obj) => obj.req.method == 'POST');
+    let api = route((obj) => obj.res.end('test'));
+    let resource = route(() => true);
+    let authenticator = route(() => true);
 
     let router = host(
         get(
@@ -82,15 +78,41 @@ try {
         )
     );
 
-    let httpServer = new HTTPServer({ 'port': 8000, 'host': 'localhost' }, async (req, res) => {
+    // let httpServer = new HTTPServer({ 'port': 8000, 'host': 'localhost' }, async (req, res) => {
+
+    //     try {
+
+    //         await router({ req, res });
+    //     }
+    //     catch (e) {
+
+    //         console.error(e);
+    //     }
+    // });
+
+    (async function () {
 
         try {
-            await router.handle({ req, res });
+
+            let obj = {
+                req: {
+                    method: 'GET'
+                },
+                res: {
+                    end: function(message) {
+                        
+                        console.log(message);
+                    }
+                }
+            }
+
+            await router(obj);
         }
         catch (e) {
+
             console.error(e);
         }
-    });
+    })();
 }
 catch (e) {
 
