@@ -42,7 +42,7 @@ function route(matcher) {
                             //  The true value would come from a terminating route.
                             //  The null value would come from a intermediate terminating route.
 
-                            return true;
+                            return pass;
                         }
                         else if (pass === false) {
                             continue;
@@ -72,11 +72,11 @@ try {
     let host = route(() => true);
     let get = route((sub) => sub.req.method == 'GET');
     let post = route((sub) => sub.req.method == 'POST');
-    let api = route((sub) => sub.req.path == 'api');
+    let api = route((sub) => sub.req.path.startsWith('api'));
     let succeed = route((sub) => { sub.res.end('succeed'); return true });
     let error = route((sub) => { throw new Error() });
     let resource = route((sub) => sub.req.path == 'resource');
-    let test = route((sub) => sub.req.path == 'test');
+    let test = route((sub) => sub.req.path.endsWith('test'));
     let authenticator = route(() => true);
 
     let root = host(
@@ -98,9 +98,14 @@ try {
         ),
         post(
             authenticator(
-                api(),
-                resource()
-            )
+                api(
+                    test(
+                        resource(),
+                        error()
+                    )
+                ),
+
+            ),
         )
     );
 
@@ -122,8 +127,8 @@ try {
 
             let sub = {
                 req: {
-                    method: 'GET',
-                    path: 'api'
+                    method: 'POST',
+                    path: 'api/test'
                 },
                 res: {
                     end: function (message) {
@@ -133,12 +138,8 @@ try {
             }
 
             console.log(`result: ${await root(sub)}`);
-
-            sub.req.get.path = 'resource'
-            console.log(`result: ${await root(sub)}`);
         }
         catch (e) {
-
             console.error(e);
         }
     })();
