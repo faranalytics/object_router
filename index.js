@@ -53,7 +53,7 @@ function route(matcher) {
                     }
 
                     return false;
-                    //  A route match was not found; hence, return a failed routing.
+                    //  The object matched; however, the routing failed; hence, try the next route in the previous layer.
                 }
             }
             else if (match === false || match === null) {
